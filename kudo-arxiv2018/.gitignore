@@ -108,3 +108,7 @@ data/h3.6m
 results*
 .DS_Store
 h36m*
+
+# caffe model and pretrained weight file
+*.prototxt
+*.caffemodel
