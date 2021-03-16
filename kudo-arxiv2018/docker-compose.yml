@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  kudo-arxiv2018:
+    build:
+      context: ./docker
+    volumes: 
+      - .:/work
+    deploy:
+        resources:
+            reservations:
+                devices:
+                    - driver: nvidia
+                      capabilities: [gpu, utility]
