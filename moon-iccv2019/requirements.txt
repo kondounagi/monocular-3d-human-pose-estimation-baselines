@@ -1,0 +1,5 @@
+pip
+opencv-contrib-python
+torch
+torchvision
+pycocotools
