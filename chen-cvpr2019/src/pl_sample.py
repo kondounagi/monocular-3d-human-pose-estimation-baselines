@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 from pprint import pprint
 
 import torch
+from torch import nn
 from torch.nn import functional as F
 
 import pytorch_lightning as pl
@@ -9,27 +10,39 @@ from pl_examples import cli_lightning_logo
 from pl_examples.basic_examples.mnist_datamodule import MNISTDataModule
 
 
-class LitClassifier(pl.LightningModule):
-    """
-    >>> LitClassifier()  # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
-    LitClassifier(
-      (l1): Linear(...)
-      (l2): Linear(...)
-    )
-    """
+class PoseNet(pl.LightningModule):
 
-    def __init__(self, hidden_dim=128, learning_rate=1e-3):
+    def __init__(self, n_in=34, n_unit=1024, mode='generator',
+                 use_bn=False, activate_func=F.reaky_relu):
         super().__init__()
         self.save_hyperparameters()
 
-        self.l1 = torch.nn.Linear(28 * 28, self.hparams.hidden_dim)
-        self.l2 = torch.nn.Linear(self.hparams.hidden_dim, 10)
+        n_out = n_in // 2 if mode == 'generator' else 1
+        print('Model: {}, N_OUT{}, N_UNIT{}'.format(node, n_out, n_unit))
+        self.mode = mode
+        self.use_bn = use_bn
+        self.activate_func = activate_func
+        self.l1 = nn.Linear(self.hparams.n_in, self.hparams.n_unit)
+        self.l2 = nn.Linear(self.hparams.n_unit, self.hparams.n_unit)
+        self.l3 = nn.Linear(self.hparams.n_unit, self.hparams.n_unit)
+        self.l4 = nn.Linear(self.hparams.n_unit, self.hparams.n_out)
+        if self.hparams.use_bn:
+            self.bn1 = nn.BatchNorm1d(self.hparams.n_unit)
+            self.bn2 = nn.BatchNorm1d(self.hparams.n_unit)
+            self.bn3 = nn.BatchNorm1d(self.hparams.n_unit)
+
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
-        x = torch.relu(self.l1(x))
-        x = torch.relu(self.l2(x))
-        return x
+        if self.use_bn:
+            h1 = self.activate_func(self.bn1(self.l1(x)))
+            h2 = self.activate_func(self.bn2(self.l2(h1)))
+            h3 = self.activate_func(self.bn3(self.l3(h2)) + h1)
+        else:
+            h1 = self.activate_func(self.l1(x))
+            h2 = self.activate_func(self.l2(h1))
+            h3 = self.activate_func(self.l3(h2) + h1)
+        return self.l4(h3)
 
     def training_step(self, batch, batch_idx):
         x, y = batch
