@@ -6,7 +6,7 @@ RUN apt-get update \
     apt-utils \
     gcc \
     build-essential \
-    && pip install --no-cache-dir \
+RUN pip install --no-cache-dir \
     autopep8 \
     flake8 \
     black \
