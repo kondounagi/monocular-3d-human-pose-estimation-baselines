@@ -114,33 +114,18 @@ class PoseNet(pl.LightningModule):
 def cli_main():
     pl.seed_everything(1234)
 
-    # ------------
-    # args
-    # ------------
     parser = ArgumentParser()
     parser = pl.Trainer.add_argparse_args(parser)
     parser = MNISTDataModule.add_argparse_args(parser)
     args = parser.parse_args()
 
-    # ------------
-    # data
-    # ------------
     dm = MNISTDataModule.from_argparse_args(args)
 
-    # ------------
-    # model
-    # ------------
     model = LitClassifier(args.hidden_dim, args.learning_rate)
 
-    # ------------
-    # training
-    # ------------
     trainer = pl.Trainer.from_argparse_args(args)
     trainer.fit(model, datamodule=dm)
 
-    # ------------
-    # testing
-    # ------------
     result = trainer.test(model, datamodule=dm)
     pprint(result)
 
