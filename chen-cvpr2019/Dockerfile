@@ -5,11 +5,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     apt-utils \
     gcc \
-    build-essential \
+    build-essential
 RUN pip install --no-cache-dir \
-    autopep8 \
+    pylint \
     flake8 \
     black \
+    pytorch-lighting \
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
