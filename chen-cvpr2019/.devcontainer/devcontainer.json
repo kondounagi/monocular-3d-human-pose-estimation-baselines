@@ -1,0 +1,18 @@
+{
+    "name": "chen-cvpr2019",
+    "dockerFile": "../Dockerfile",
+    "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash",
+        "python.pythonPath": "/usr/local/bin/python",
+        "python.formatting.provider": "black",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.linting.pylintPath": "/usr/local/bin/pylint",
+    },
+    "[python]": {
+        "editor.formatOnSave": true
+    },
+    "extensions": [
+        "ms-python.python"
+    ]
+}
