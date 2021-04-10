@@ -1,15 +1,41 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# Copyright (c) 2017 Yasunori Kudo
-
 import copy
 import os
 import pickle
 
-import chainer
 import numpy as np
+import torch
 
-from . import pose_dataset_base
+
+class Normalization(object):
+    @staticmethod
+    def normalize_3d(pose):
+        # 3Dモデルの正規化
+        # hip(0)と各関節点の距離の平均値が1になるようにスケール
+        xs = pose.T[0::3] - pose.T[0]
+        ys = pose.T[1::3] - pose.T[1]
+        ls = np.sqrt(xs[1:] ** 2 + ys[1:] ** 2)  # 原点からの距離 shape=(N-1,length)
+        scale = ls.mean(axis=0)
+        pose = pose.T / scale
+        # hip(0)が原点になるようにシフト
+        pose[0::3] -= pose[0].copy()
+        pose[1::3] -= pose[1].copy()
+        pose[2::3] -= pose[2].copy()
+        return pose.T, scale
+
+    @staticmethod
+    def normalize_2d(pose):
+        # 2DPoseの正規化
+        # hip(0)と各関節点の距離の平均値が1になるようにスケール
+        xs = pose.T[0::2] - pose.T[0]
+        ys = pose.T[1::2] - pose.T[1]
+        pose = pose.T / np.sqrt(xs[1:] ** 2 + ys[1:] ** 2).mean(axis=0)
+        # hip(0)が原点になるようにシフト
+        mu_x = pose[0].copy()
+        mu_y = pose[1].copy()
+        pose[0::2] -= mu_x
+        pose[1::2] -= mu_y
+        return pose.T
+
 
 # Joints in H3.6M -- data has 32 joints,
 # but only 17 that move; these are the indices.
@@ -189,7 +215,7 @@ class H36M(pose_dataset_base.PoseDatasetBase):
     def __len__(self):
         return len(self.data_list)
 
-    def get_example(self, i):
+    def __getitem__(self, i):
         info = self.data_list[i]
         subject = info["subject"]
         start_pos = info["start_pos"]
@@ -231,7 +257,7 @@ class H36M(pose_dataset_base.PoseDatasetBase):
             return proj, X, scale
 
 
-class MPII(chainer.dataset.DatasetMixin):
+class MPII(torch.utils.data.Dataset):
     def __init__(self, train=True, use_sh_detection=False):
         if use_sh_detection:
             raise NotImplementedError
@@ -248,8 +274,8 @@ class MPII(chainer.dataset.DatasetMixin):
     def __len__(self):
         return self.poses.shape[0]
 
-    def get_example(self, i):
-        mpii_poses = self.poses[i : i + 1]
+    def __getitem__(self, idx):
+        mpii_poses = self.poses[idx : idx + 1]
         # hip(0)と各関節点の距離の平均値が1になるようにスケール
         xs = mpii_poses.T[0::2] - mpii_poses.T[0]
         ys = mpii_poses.T[1::2] - mpii_poses.T[1]
