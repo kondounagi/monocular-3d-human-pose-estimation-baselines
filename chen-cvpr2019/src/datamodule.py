@@ -19,16 +19,16 @@ class MPIIDataModule(LightningDataModule):
     #     # called on every process in DDP
     def train_dataloader(self):
         train_split = MPII(train=True, use_sh_detection=self.use_sh_detection)
-        return DataLoader(train_split)
+        return DataLoader(train_split, batch_size=16)
 
     def val_dataloader(self):
         # val_split = MPII(train=False, use_sh_detection=self.use_sh_detection)
         val_split = H36M(train=True)
-        return DataLoader(val_split)
+        return DataLoader(val_split, batch_size=16)
 
     def test_dataloader(self):
         test_split = H36M(train=False)
-        return DataLoader(test_split)
+        return DataLoader(test_split, batch_size=16)
 
     # def teardown(self):
     # clean up after fit or test
