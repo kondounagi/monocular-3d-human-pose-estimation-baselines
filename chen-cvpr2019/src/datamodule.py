@@ -6,6 +6,34 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
 
+class MPIIDataModule(LightningDataModule):
+    def __init__(self, use_sh_detection: bool):
+        super().__init__()
+        self.use_sh_detection = use_sh_detection
+
+    # def prepare_data(self):
+    #     # download, split, etc...
+    #     # only called on 1 GPU/TPU in distributed
+    # def setup(self):
+    #     # make assignments here (val/train/test split)
+    #     # called on every process in DDP
+    def train_dataloader(self):
+        train_split = MPII(train=True, use_sh_detection=self.use_sh_detection)
+        return DataLoader(train_split)
+
+    def val_dataloader(self):
+        # val_split = MPII(train=False, use_sh_detection=self.use_sh_detection)
+        val_split = H36M(train=True)
+        return DataLoader(val_split)
+
+    def test_dataloader(self):
+        test_split = H36M(train=False)
+        return DataLoader(test_split)
+
+    # def teardown(self):
+    # clean up after fit or test
+    # called on every process in DDP
+
 class Normalization(object):
     @staticmethod
     def normalize_3d(pose):
@@ -37,32 +65,6 @@ class Normalization(object):
         return pose.T
 
 
-class MPIIDataModule(LightningDataModule):
-    def __init__(self, use_sh_detection: bool):
-        super().__init__()
-        self.use_sh_detection = use_sh_detection
-
-    # def prepare_data(self):
-    #     # download, split, etc...
-    #     # only called on 1 GPU/TPU in distributed
-    # def setup(self):
-    #     # make assignments here (val/train/test split)
-    #     # called on every process in DDP
-    def train_dataloader(self):
-        train_split = MPII(train=True, use_sh_detection=self.use_sh_detection)
-        return DataLoader(train_split)
-
-    def val_dataloader(self):
-        val_split = MPII(train=False, use_sh_detection=self.use_sh_detection)
-        return DataLoader(val_split)
-
-    def test_dataloader(self):
-        test_split = H36M(train=False)
-        return DataLoader(test_split)
-
-    # def teardown(self):
-    # clean up after fit or test
-    # called on every process in DDP
 
 
 class MPII(Dataset):
