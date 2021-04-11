@@ -15,9 +15,9 @@ from datamodule import MPIIDataModule
 class PoseNet(pl.LightningModule):
     def __init__(
         self,
-        gan_accuracy_cap: float,
-        use_heuristic_loss: bool,
-        heuristic_loss_weight: float,
+        gan_accuracy_cap: float = 0.9,
+        heuristic_loss_weight: float = 0.5,  # XXX: source ?
+        use_heuristic_loss: bool = False,
         use_sh_detection: bool = False,
         n_in: int = 34,
         n_unit: int = 1024,
@@ -141,14 +141,6 @@ class PoseNet(pl.LightningModule):
         return torch.mean(F.relu(-self.calculate_rotation(xy_real, z_pred)))
 
 
-checkpoint_callback = pl.callbacks.ModelCheckpoint(
-    monitor="val_loss",
-    filename="best-model-{epoch:02d}-{val_loss:.2f}",
-    save_top_k=1,
-    mode="min",
-)
-
-
 def cli_main():
     pl.seed_everything(1234)
 
@@ -157,7 +149,13 @@ def cli_main():
     parser = MPIIDataModule.add_argparse_args(parser)
     args = parser.parse_args()
 
-    # dm = MPIIDataModule(use_sh_detection=args.use_sh_detection)
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        monitor="val_loss",
+        filename="best-model-{epoch:02d}-{val_loss:.2f}",
+        save_top_k=1,
+        mode="min",
+    )
+    dm = MPIIDataModule(use_sh_detection=args.use_sh_detection)
 
     model = PoseNet()
 
