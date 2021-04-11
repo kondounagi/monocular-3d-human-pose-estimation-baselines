@@ -1,5 +1,5 @@
 from torch import nn
-from torch import functional as F
+from torch.nn import functional as F
 
 
 class KudoModel(nn.Module):

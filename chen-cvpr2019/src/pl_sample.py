@@ -1,3 +1,4 @@
+import copy
 from argparse import ArgumentParser
 from pprint import pprint
 
@@ -29,10 +30,10 @@ class PoseNet(pl.LightningModule):
         self.save_hyperparameters()
 
         # set generator and parameter
-        gen_hparams = self.hparams.deepcopy()
+        gen_hparams = copy.deepcopy(self.hparams)
         gen_hparams["mode"] = "generator"
         self.gen = KudoModel(**gen_hparams)
-        dis_hparams = self.hparams.deepcopy()
+        dis_hparams = copy.deepcopy(self.hparams)
         self.dis = KudoModel(**dis_hparams)
 
         self.train_metrics = nn.ModuleDict(

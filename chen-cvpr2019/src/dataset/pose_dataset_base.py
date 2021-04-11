@@ -1,4 +1,3 @@
-import chainer
 import numpy as np
 
 
@@ -31,11 +30,3 @@ class Normalization(object):
         pose[0::2] -= mu_x
         pose[1::2] -= mu_y
         return pose.T
-
-
-class PoseDatasetBase(chainer.dataset.DatasetMixin):
-    def _normalize_3d(self, pose):
-        return Normalization.normalize_3d(pose)
-
-    def _normalize_2d(self, pose):
-        return Normalization.normalize_2d(pose)
