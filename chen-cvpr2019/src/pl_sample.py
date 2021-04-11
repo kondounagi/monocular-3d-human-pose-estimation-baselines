@@ -16,6 +16,7 @@ from datamodule import MPIIDataModule
 class PoseNet(pl.LightningModule):
     def __init__(
         self,
+        lr: float = 0.001,
         gan_accuracy_cap: float = 0.9,
         heuristic_loss_weight: float = 0.5,  # XXX: source ?
         use_heuristic_loss: bool = False,
@@ -119,7 +120,7 @@ class PoseNet(pl.LightningModule):
         self.log("test_loss", loss)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
 
     @staticmethod
     def calculate_rotation(xy_real, z_pred):
@@ -163,9 +164,11 @@ def cli_main():
     mlf_logger = MLFlowLogger(
         experiment_name="chen-cvpr2019", tracking_uri="file:./ml-runs"
     )
-    trainer = pl.Trainer.from_argparse_args(args)
+    trainer = pl.Trainer.from_argparse_args(
+        args, callbacks=[checkpoint_callback], logger=mlf_logger, auto_lr_find=True)
+    trainer.tune(model, datamodule=dm)
     trainer.fit(
-        model, datamodule=dm, callbacks=[checkpoint_callback], logger=mlf_logger
+        model
     )
 
     result = trainer.test(model, datamodule=dm)
