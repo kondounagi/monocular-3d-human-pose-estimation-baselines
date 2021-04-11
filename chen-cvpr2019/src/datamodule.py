@@ -1,4 +1,6 @@
 import copy
+import os
+import pickle
 
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
@@ -69,16 +71,6 @@ class MPII(Dataset):
         dummy_scale = np.array([1], dtype=np.float32)
 
         return mpii_poses, dummy_X, dummy_scale
-
-
-import copy
-import os
-import pickle
-
-import chainer
-import numpy as np
-
-from . import pose_dataset_base
 
 # Joints in H3.6M -- data has 32 joints,
 # but only 17 that move; these are the indices.
