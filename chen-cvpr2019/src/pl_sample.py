@@ -9,7 +9,7 @@ import pytorch_lightning as pl
 from pl_examples import cli_lightning_logo
 
 from kudo_model import KudoModel
-from dataset import MPII
+from datamodule import MPIIDataModule
 
 
 class PoseNet(pl.LightningModule):
@@ -18,6 +18,7 @@ class PoseNet(pl.LightningModule):
         gan_accuracy_cap: float,
         use_heuristic_loss: bool,
         heuristic_loss_weight: float,
+        use_sh_detection: bool = False,
         n_in: int = 34,
         n_unit: int = 1024,
         mode: str = "supervised",
@@ -108,7 +109,7 @@ class PoseNet(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = F.mse_loss(y_hat, y)
-        self.log("valid_loss", loss)
+        self.log("val_loss", loss)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -140,20 +141,28 @@ class PoseNet(pl.LightningModule):
         return torch.mean(F.relu(-self.calculate_rotation(xy_real, z_pred)))
 
 
-class MPIIDataLoader()
+checkpoint_callback = pl.callbacks.ModelCheckpoint(
+    monitor="val_loss",
+    filename="best-model-{epoch:02d}-{val_loss:.2f}",
+    save_top_k=1,
+    mode="min",
+)
+
 
 def cli_main():
     pl.seed_everything(1234)
 
     parser = ArgumentParser()
     parser = pl.Trainer.add_argparse_args(parser)
-    parser = MNISTDataModule.add_argparse_args(parser)
+    parser = MPIIDataModule.add_argparse_args(parser)
     args = parser.parse_args()
 
-    model = PoseNet(args.hidden_dim, args.learning_rate)
+    # dm = MPIIDataModule(use_sh_detection=args.use_sh_detection)
+
+    model = PoseNet()
 
     trainer = pl.Trainer.from_argparse_args(args)
-    trainer.fit(model, datamodule=dm)
+    trainer.fit(model, datamodule=dm, callbacks=[checkpoint_callback])
 
     result = trainer.test(model, datamodule=dm)
     pprint(result)
