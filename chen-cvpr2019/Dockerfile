@@ -13,6 +13,7 @@ RUN pip install --upgrade pip \
     flake8 \
     black \
     pytorch-lightning \
+    mlflow \
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*

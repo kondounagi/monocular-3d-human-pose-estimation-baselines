@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import pytorch_lightning as pl
-from pl_examples import cli_lightning_logo
+from pytorch_lightning.loggers import MLFlowLogger
 
 from kudo_model import KudoModel
 from datamodule import MPIIDataModule
@@ -159,13 +159,17 @@ def cli_main():
 
     model = PoseNet()
 
+    mlf_logger = MLFlowLogger(
+        experiment_name="chen-cvpr2019", tracking_uri="file:./ml-runs"
+    )
     trainer = pl.Trainer.from_argparse_args(args)
-    trainer.fit(model, datamodule=dm, callbacks=[checkpoint_callback])
+    trainer.fit(
+        model, datamodule=dm, callbacks=[checkpoint_callback], logger=mlf_logger
+    )
 
     result = trainer.test(model, datamodule=dm)
     pprint(result)
 
 
 if __name__ == "__main__":
-    cli_lightning_logo()
     cli_main()
