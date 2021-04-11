@@ -1,6 +1,6 @@
 import glob
 
-import numpy
+import numpy as np
 import scipy.io
 import collections
 import typing
@@ -42,7 +42,7 @@ class H36CompatibleJoints(object):
 
     @staticmethod
     def convert_points(raw_vector):
-        return numpy.array(
+        return np.array(
             [
                 (int(raw_vector[i * 2]), int(raw_vector[i * 2 + 1]))
                 for i in H36CompatibleJoints.joint_idx
@@ -51,7 +51,7 @@ class H36CompatibleJoints(object):
 
     @staticmethod
     def convert_points_3d(raw_vector):
-        return numpy.array(
+        return np.array(
             [
                 (
                     float(raw_vector[i * 3]),
@@ -85,12 +85,12 @@ class MPII3DDatasetUtil(object):
             if key == "intrinsic":
                 values = line.split()[1:]
                 values = [float(value) for value in values]
-                values = numpy.array(values).reshape((4, 4))
+                values = np.array(values).reshape((4, 4))
                 params[index]["intrinsic"] = values
             if key == "extrinsic":
                 values = line.split()[1:]
                 values = [float(value) for value in values]
-                values = numpy.array(values).reshape((4, 4))
+                values = np.array(values).reshape((4, 4))
                 params[index]["extrinsic"] = values
         return params
 
@@ -98,10 +98,10 @@ class MPII3DDatasetUtil(object):
 MPII3DDatum = typing.NamedTuple(
     "MPII3DDatum",
     [
-        ("annotation_2d", numpy.ndarray),
-        ("annotation_3d", numpy.ndarray),
-        ("normalized_annotation_2d", numpy.ndarray),
-        ("normalized_annotation_3d", numpy.ndarray),
+        ("annotation_2d", np.ndarray),
+        ("annotation_3d", np.ndarray),
+        ("normalized_annotation_2d", np.ndarray),
+        ("normalized_annotation_3d", np.ndarray),
         ("normalize_3d_scale", float),
     ],
 )

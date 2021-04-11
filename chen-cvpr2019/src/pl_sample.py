@@ -5,59 +5,53 @@ import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
-
 import pytorch_lightning as pl
 from pl_examples import cli_lightning_logo
-from pl_examples.basic_examples.mnist_datamodule import MNISTDataModule
+
+from kudo_model import KudoModel
+from dataset import MPII
 
 
 class PoseNet(pl.LightningModule):
-
-    def __init__(self, n_in=34, n_unit=1024, mode='supervised',
-                 use_bn=False, activate_func=F.reaky_relu):
+    def __init__(
+        self,
+        gan_accuracy_cap: float,
+        use_heuristic_loss: bool,
+        heuristic_loss_weight: float,
+        n_in: int = 34,
+        n_unit: int = 1024,
+        mode: str = "supervised",
+        use_bn: bool = False,
+        activate_func=F.leaky_relu,
+    ):
         super().__init__()
         self.save_hyperparameters()
 
-        n_out = n_in // 2 if mode == 'generator' else 1
-        print('Model: {}, N_OUT{}, N_UNIT{}'.format(node, n_out, n_unit))
-        self.mode = mode
-        self.use_bn = use_bn
-        self.activate_func = activate_func
-        self.l1 = nn.Linear(self.hparams.n_in, self.hparams.n_unit)
-        self.l2 = nn.Linear(self.hparams.n_unit, self.hparams.n_unit)
-        self.l3 = nn.Linear(self.hparams.n_unit, self.hparams.n_unit)
-        self.l4 = nn.Linear(self.hparams.n_unit, self.hparams.n_out)
-        if self.hparams.use_bn:
-            self.bn1 = nn.BatchNorm1d(self.hparams.n_unit)
-            self.bn2 = nn.BatchNorm1d(self.hparams.n_unit)
-            self.bn3 = nn.BatchNorm1d(self.hparams.n_unit)
+        # set generator and parameter
+        gen_hparams = self.hparams.deepcopy()
+        gen_hparams["mode"] = "generator"
+        self.gen = KudoModel(**gen_hparams)
+        dis_hparams = self.hparams.deepcopy()
+        self.dis = KudoModel(**dis_hparams)
 
-        self.train_metrics = nn.ModuleDict({''})
-        self.val_metrics = nn.ModuleDict({''})
-        self.test_metrics = nn.ModuleDict({''})
-
+        self.train_metrics = nn.ModuleDict(
+            {"discriminator_accuracy": pl.metrics.Accuracy()}
+        )
+        self.val_metrics = nn.ModuleDict({"acc": pl.metrics.Accuracy()})
+        # self.test_metrics = nn.ModuleDict({""})
 
     def forward(self, x):
-        x = x.view(x.size(0), -1)
-        if self.use_bn:
-            h1 = self.activate_func(self.bn1(self.l1(x)))
-            h2 = self.activate_func(self.bn2(self.l2(h1)))
-            h3 = self.activate_func(self.bn3(self.l3(h2)) + h1)
-        else:
-            h1 = self.activate_func(self.l1(x))
-            h2 = self.activate_func(self.l2(h1))
-            h3 = self.activate_func(self.l3(h2) + h1)
-        return self.l4(h3)
+        return self.gen(x)
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx, optimizer_idx):
         # xy_real: joint_num * 2(xy axis)
         xy_real, z_real = batch
         batch_size = len(xy_real)
         z_pred = self(xy_real)
         z_mse = F.mse_loss(z_pred, z_real)
-        if self.mode == 'supervised':
+        if self.mode == "supervised":
             loss = z_mse
-        elif self.mode == 'unsupervised':
+        elif self.mode == "unsupervised":
             # Random rotation
             # TODO: [0, 2pi) の一様分布をautogradありで生成する方法のベストプラクティスを探す
             theta = torch.rand(1) * 2 * np.pi
@@ -70,8 +64,43 @@ class PoseNet(pl.LightningModule):
             new_x = x * cos_theta + z_pred * sin_theta
             xy_fake = torch.concat((new_x, y), dim=2).view(batch_size, -1)
 
-            acc_dis_fake = F.binar
-            acc_dis_real
+            y_real = self(xy_real)
+            y_fake = self(xy_fake)
+
+            acc_dis_fake = pl.metrics.functional.accuracy(
+                y_real, torch.zeros_like(y_real)
+            )
+            acc_dis_real = pl.metrics.functional.accuracy(
+                y_real, torch.ones_like(y_real)
+            )
+            acc_dis = (acc_dis_fake + acc_dis_real) / 2
+
+            loss_gen = F.sum(F.softplus(-y_fake)) / batch_size
+            if self.hparams.use_heuristic_loss:
+                loss_heuristic = self.calculate_heuristic_loss(
+                    xy_real=xy_real, z_pred=z_pred
+                )
+                loss_gen += loss_heuristic * self.hparams.heuristic_loss_weight
+                self.log("loss_heuristic", loss_heuristic)
+
+            loss_dis = F.softplus(-y_real).sum() / batch_size
+            loss_dis += F.softplus(y_fake).sum() / batch_size
+
+            self.log(
+                {
+                    "loss_gen": loss_gen,
+                    "z_mse": z_mse,
+                    "loss_dis": loss_dis,
+                    "acc_dis": acc_dis,
+                    "acc/fake": acc_dis_fake,
+                    "acc/real": acc_dis_real,
+                }
+            )
+
+            if acc_dis >= (1 - self.gan_accuracy_cap):
+                return loss_gen
+            else:
+                return loss_dis
 
         return loss
 
@@ -79,13 +108,13 @@ class PoseNet(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = F.mse_loss(y_hat, y)
-        self.log('valid_loss', loss)
+        self.log("valid_loss", loss)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
         loss = F.mse_loss(y_hat, y)
-        self.log('test_loss', loss)
+        self.log("test_loss", loss)
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
@@ -107,9 +136,11 @@ class PoseNet(pl.LightningModule):
         return (a0 * b1 - a1 * b0) / (n0 * n1)
 
     @staticmethod
-    def calculate_heuristic_loss(xy_real, z_pred):
+    def calculate_heuristic_loss(self, xy_real, z_pred):
         return torch.mean(F.relu(-self.calculate_rotation(xy_real, z_pred)))
 
+
+class MPIIDataLoader()
 
 def cli_main():
     pl.seed_everything(1234)
@@ -119,9 +150,7 @@ def cli_main():
     parser = MNISTDataModule.add_argparse_args(parser)
     args = parser.parse_args()
 
-    dm = MNISTDataModule.from_argparse_args(args)
-
-    model = LitClassifier(args.hidden_dim, args.learning_rate)
+    model = PoseNet(args.hidden_dim, args.learning_rate)
 
     trainer = pl.Trainer.from_argparse_args(args)
     trainer.fit(model, datamodule=dm)
@@ -130,7 +159,6 @@ def cli_main():
     pprint(result)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli_lightning_logo()
     cli_main()
-
