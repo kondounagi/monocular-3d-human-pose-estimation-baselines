@@ -46,15 +46,17 @@ class PoseNet(pl.LightningModule):
     def forward(self, x):
         return self.gen(x)
 
-    def training_step(self, batch, batch_idx, optimizer_idx):
+    def training_step(self, batch, batch_idx):
         # xy_real: joint_num * 2(xy axis)
-        xy_real, z_real = batch
+        # xy_proj, xyz, scale = batch
+        xy_proj, xyz, scale = batch
+        xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
         batch_size = len(xy_real)
         z_pred = self(xy_real)
-        z_mse = F.mse_loss(z_pred, z_real)
-        if self.mode == "supervised":
+        z_mse = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
+        if self.hparams.mode == "supervised":
             loss = z_mse
-        elif self.mode == "unsupervised":
+        elif self.hparams.mode == "unsupervised":
             # Random rotation
             # TODO: [0, 2pi) の一様分布をautogradありで生成する方法のベストプラクティスを探す
             theta = torch.rand(1) * 2 * np.pi
@@ -108,16 +110,22 @@ class PoseNet(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self(x)
-        loss = F.mse_loss(y_hat, y)
+        xy_proj, xyz, scale = batch
+        xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
+        z_pred = self(xy_real)
+        loss = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
         self.log("val_loss", loss)
 
     def test_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self(x)
-        loss = F.mse_loss(y_hat, y)
+        xy_proj, xyz, scale = batch
+        xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
+        z_pred = self(xy_real)
+        loss = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
         self.log("test_loss", loss)
+        # x, y = batch
+        # y_hat = self(x)
+        # loss = F.mse_loss(y_hat, y)
+        # self.log("test_loss", loss)
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
