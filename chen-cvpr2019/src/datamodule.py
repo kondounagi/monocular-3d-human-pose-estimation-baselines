@@ -72,6 +72,7 @@ class MPII(Dataset):
 
         return mpii_poses, dummy_X, dummy_scale
 
+
 # Joints in H3.6M -- data has 32 joints,
 # but only 17 that move; these are the indices.
 H36M_NAMES = [""] * 32
@@ -287,6 +288,6 @@ class H36M(Dataset):
             # カメラパラメータを用いた画像上への投影
             proj = project_point_radial(P, **params)[0]
             proj = proj.reshape(-1, self.N * 2)  # shape=(length, 2*n_joints)
-            proj = Normalization._normalize_2d(proj)
+            proj = Normalization.normalize_2d(proj)
             proj = proj.astype(np.float32)
             return proj, X, scale
