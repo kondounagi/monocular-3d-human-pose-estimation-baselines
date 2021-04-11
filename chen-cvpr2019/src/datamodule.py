@@ -1,7 +1,6 @@
+import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
-
-from dataset import h3
 
 
 class MPIIDataModule(LightningDataModule):
