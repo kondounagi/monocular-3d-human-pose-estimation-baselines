@@ -88,7 +88,7 @@ class PoseNet(pl.LightningModule):
             )
             acc_dis = (acc_dis_fake + acc_dis_real) / 2
 
-            loss_gen = F.sum(F.softplus(-y_fake)) / batch_size
+            loss_gen = F.softplus(-y_fake).sum() / batch_size
             if self.hparams.use_heuristic_loss:
                 loss_heuristic = self.calculate_heuristic_loss(
                     xy_real=xy_real, z_pred=z_pred
@@ -99,18 +99,14 @@ class PoseNet(pl.LightningModule):
             loss_dis = F.softplus(-y_real).sum() / batch_size
             loss_dis += F.softplus(y_fake).sum() / batch_size
 
-            self.log(
-                {
-                    "loss_gen": loss_gen,
-                    "z_mse": z_mse,
-                    "loss_dis": loss_dis,
-                    "acc_dis": acc_dis,
-                    "acc/fake": acc_dis_fake,
-                    "acc/real": acc_dis_real,
-                }
-            )
+            self.log("loss_gen", loss_gen)
+            self.log("z_mse", z_mse)
+            self.log("loss_dis", loss_dis)
+            self.log("acc_dis", acc_dis)
+            self.log("acc/fake", acc_dis_fake)
+            self.log("acc/real", acc_dis_real)
 
-            if acc_dis >= (1 - self.gan_accuracy_cap):
+            if acc_dis >= (1 - self.hparams.gan_accuracy_cap):
                 return loss_gen
             else:
                 return loss_dis
