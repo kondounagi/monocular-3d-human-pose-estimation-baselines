@@ -8,7 +8,7 @@ class KudoModel(nn.Module):
         n_in: int = 34,
         n_unit: int = 1024,
         mode: str = "supervised",
-        use_bn: bool = False,
+        use_bn: bool = True,
         activate_func=F.leaky_relu,
         **kwargs
     ):
