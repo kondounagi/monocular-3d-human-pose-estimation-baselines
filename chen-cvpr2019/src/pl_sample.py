@@ -79,7 +79,6 @@ class PoseNet(pl.LightningModule):
             y_real = self.dis(xy_real)
             y_fake = self.dis(xy_fake)
 
-            print('**** unko ***', y_real, y_real.shape)
             acc_dis_fake = pl.metrics.functional.accuracy(
                 y_fake, torch.zeros_like(y_fake, dtype=torch.int)
             )
