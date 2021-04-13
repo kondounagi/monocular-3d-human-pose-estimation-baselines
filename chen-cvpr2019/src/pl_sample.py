@@ -35,6 +35,7 @@ class PoseNet(pl.LightningModule):
         gen_hparams["mode"] = "generator"
         self.gen = KudoModel(**gen_hparams)
         dis_hparams = copy.deepcopy(self.hparams)
+        dis_hparams["mode"] = "discriminator"
         self.dis = KudoModel(**dis_hparams)
 
         self.train_metrics = nn.ModuleDict(
@@ -60,7 +61,7 @@ class PoseNet(pl.LightningModule):
         elif self.hparams.mode == "unsupervised":
             # Random rotation
             # TODO: [0, 2pi) の一様分布をautogradありで生成する方法のベストプラクティスを探す
-            theta = torch.rand(1) * 2 * np.pi
+            theta = torch.rand(batch_size, 1) * 2 * np.pi
             cos_theta = torch.cos(theta)
             sin_theta = torch.sin(theta)
 
@@ -73,17 +74,17 @@ class PoseNet(pl.LightningModule):
             y = xy_real.narrow(-1, 1, 1).squeeze()
             # y = xy_real[:, 1::2]
             new_x = x * cos_theta + z_pred * sin_theta
-            print('**** unko ***', new_x.shape, y.shape)
             xy_fake = torch.stack((new_x, y), dim=2)# .view(batch_size, -1)
 
-            y_real = self(xy_real)
-            y_fake = self(xy_fake)
+            y_real = self.dis(xy_real)
+            y_fake = self.dis(xy_fake)
 
+            print('**** unko ***', y_real, y_real.shape)
             acc_dis_fake = pl.metrics.functional.accuracy(
-                y_real, torch.zeros_like(y_real)
+                y_fake, torch.zeros_like(y_fake, dtype=torch.int)
             )
             acc_dis_real = pl.metrics.functional.accuracy(
-                y_real, torch.ones_like(y_real)
+                y_real, torch.ones_like(y_real, dtype=torch.int)
             )
             acc_dis = (acc_dis_fake + acc_dis_real) / 2
 

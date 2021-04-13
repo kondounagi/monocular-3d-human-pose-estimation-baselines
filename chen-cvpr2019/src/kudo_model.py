@@ -36,8 +36,14 @@ class KudoModel(nn.Module):
             h1 = self.activate_func(self.bn1(self.l1(x)))
             h2 = self.activate_func(self.bn2(self.l2(h1)))
             h3 = self.activate_func(self.bn3(self.l3(h2)) + h1)
+            h4 = self.l4(h3)
+            if self.mode == "discriminator":
+                h4 = F.sigmoid(h4)
         else:
             h1 = self.activate_func(self.l1(x))
             h2 = self.activate_func(self.l2(h1))
             h3 = self.activate_func(self.l3(h2) + h1)
-        return self.l4(h3)
+            h4 = self.l4(h3)
+            if self.mode == "discriminator":
+                h4 = F.sigmoid(h4)
+        return h4
