@@ -23,8 +23,8 @@ class PoseNet(pl.LightningModule):
         use_sh_detection: bool = False,
         n_in: int = 34,
         n_unit: int = 1024,
-        mode: str = "supervised",
-        use_bn: bool = False,
+        mode: str = "unsupervised",
+        use_bn: bool = True,
         activate_func=F.leaky_relu,
     ):
         super().__init__()
@@ -40,7 +40,7 @@ class PoseNet(pl.LightningModule):
         self.train_metrics = nn.ModuleDict(
             {"discriminator_accuracy": pl.metrics.Accuracy()}
         )
-        self.val_metrics = nn.ModuleDict({"acc": pl.metrics.Accuracy()})
+        # self.val_metrics = nn.ModuleDict({"acc": pl.metrics.Accuracy()})
         # self.test_metrics = nn.ModuleDict({""})
 
     def forward(self, x):
@@ -50,10 +50,11 @@ class PoseNet(pl.LightningModule):
         # xy_real: joint_num * 2(xy axis)
         # xy_proj, xyz, scale = batch
         xy_proj, xyz, scale = batch
+        batch_size = len(xy_proj)
         xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
-        batch_size = len(xy_real)
+        z_real = xyz.narrow(-1, 2, 1)
         z_pred = self(xy_real)
-        z_mse = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
+        z_mse = F.mse_loss(z_pred, z_real)
         if self.hparams.mode == "supervised":
             loss = z_mse
         elif self.hparams.mode == "unsupervised":
@@ -64,10 +65,16 @@ class PoseNet(pl.LightningModule):
             sin_theta = torch.sin(theta)
 
             # 2D Projection
-            x = xy_real[:, 0::2]
-            y = xy_real[:, 1::2]
+            # x = xy_real[:, 0::2]
+            # y = xy_real[:, 1::2]
+
+            xy_real = xy_real.view(batch_size, 17, 2)
+            x = xy_real.narrow(-1, 0, 1).squeeze()
+            y = xy_real.narrow(-1, 1, 1).squeeze()
+            # y = xy_real[:, 1::2]
             new_x = x * cos_theta + z_pred * sin_theta
-            xy_fake = torch.concat((new_x, y), dim=2).view(batch_size, -1)
+            print('**** unko ***', new_x.shape, y.shape)
+            xy_fake = torch.stack((new_x, y), dim=2)# .view(batch_size, -1)
 
             y_real = self(xy_real)
             y_fake = self(xy_fake)
