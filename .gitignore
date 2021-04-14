@@ -132,3 +132,5 @@ dmypy.json
 ml-runs/
 *.ckpt
 .vscode/
+false/
+lightning_logs/
