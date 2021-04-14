@@ -47,7 +47,7 @@ class PoseNet(pl.LightningModule):
     def forward(self, x):
         return self.gen(x)
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx, optimizer_idx):
         # xy_real: joint_num * 2(xy axis)
         # xy_proj, xyz, scale = batch
         xy_proj, xyz, scale = batch
@@ -57,13 +57,14 @@ class PoseNet(pl.LightningModule):
         z_pred = self(xy_real)
         z_mse = F.mse_loss(z_pred, z_real)
         if self.hparams.mode == "supervised":
-            loss = z_mse
+            return z_mse
         elif self.hparams.mode == "unsupervised":
             # Random rotation
             # TODO: [0, 2pi) の一様分布をautogradありで生成する方法のベストプラクティスを探す
             theta = torch.rand(batch_size, 1) * 2 * np.pi
-            cos_theta = torch.cos(theta)
-            sin_theta = torch.sin(theta)
+            cos_theta = torch.cos(theta).to(self.device)
+            sin_theta = torch.sin(theta).to(self.device)
+
 
             # 2D Projection
             # x = xy_real[:, 0::2]
@@ -80,10 +81,10 @@ class PoseNet(pl.LightningModule):
             y_fake = self.dis(xy_fake)
 
             acc_dis_fake = pl.metrics.functional.accuracy(
-                y_fake, torch.zeros_like(y_fake, dtype=torch.int)
+                y_fake, torch.zeros_like(y_fake, dtype=torch.int).to(self.device)
             )
             acc_dis_real = pl.metrics.functional.accuracy(
-                y_real, torch.ones_like(y_real, dtype=torch.int)
+                y_real, torch.ones_like(y_real, dtype=torch.int).to(self.device)
             )
             acc_dis = (acc_dis_fake + acc_dis_real) / 2
 
@@ -105,12 +106,18 @@ class PoseNet(pl.LightningModule):
             self.log("acc/fake", acc_dis_fake)
             self.log("acc/real", acc_dis_real)
 
-            if acc_dis >= (1 - self.hparams.gan_accuracy_cap):
-                return loss_gen
+            if optimizer_idx == 0:
+                if acc_dis >= (1 - self.hparams.gan_accuracy_cap):
+                    return loss_gen
+                else:
+                    pass
+            elif optimizer_idx == 1:
+                if acc_dis <= self.hparams.gan_accuracy_cap:
+                    return loss_dis
+                else:
+                    pass
             else:
-                return loss_dis
-
-        return loss
+                return NotImplementedError
 
     def validation_step(self, batch, batch_idx):
         xy_proj, xyz, scale = batch
@@ -131,7 +138,10 @@ class PoseNet(pl.LightningModule):
         # self.log("test_loss", loss)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
+        # TODO: change lr between dis and gen
+        opt_g = torch.optim.Adam(self.gen.parameters(), lr=self.hparams.lr)
+        opt_d = torch.optim.Adam(self.dis.parameters(), lr=self.hparams.lr)
+        return [opt_g, opt_d], []
 
     @staticmethod
     def calculate_rotation(xy_real, z_pred):
@@ -175,11 +185,13 @@ def cli_main():
     mlf_logger = MLFlowLogger(
         experiment_name="chen-cvpr2019", tracking_uri="file:./ml-runs"
     )
-    trainer = pl.Trainer.from_argparse_args(
-        args, callbacks=[checkpoint_callback], logger=mlf_logger, auto_lr_find=True)
+    trainer = pl.Trainer.from_argparse_args(args, callbacks=[checkpoint_callback])
+    # args, callbacks=[checkpoint_callback], logger=mlf_logger, auto_lr_find=True)
+    # args, callbacks=[checkpoint_callback], auto_lr_find=True, max_epochs=3)
     trainer.tune(model, datamodule=dm)
     trainer.fit(
-        model
+        model,
+        dm
     )
 
     result = trainer.test(model, datamodule=dm)
