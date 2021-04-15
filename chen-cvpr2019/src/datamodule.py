@@ -10,6 +10,8 @@ from pytorch_lightning import LightningDataModule
 class CustomDataModule(LightningDataModule):
     def __init__(self, use_sh_detection: bool = False, batch_size: int = 16):
         super().__init__()
+        # TODO: use 2d detection module for dataset
+        assert use_sh_detection is False
         self.use_sh_detection = use_sh_detection
         self.batch_size = batch_size
 

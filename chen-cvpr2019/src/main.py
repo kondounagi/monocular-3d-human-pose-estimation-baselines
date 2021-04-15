@@ -10,6 +10,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import MLFlowLogger
 
 from kudo_model import KudoModel
+from martinez_model import MartinezModel
 from datamodule import CustomDataModule
 
 
@@ -25,8 +26,8 @@ class PoseNet(pl.LightningModule):
         n_in: int = 34,
         n_unit: int = 1024,
         mode: str = "unsupervised",
-        use_bn: bool = True,
         activate_func=F.leaky_relu,
+        model_type: str = "martinez",
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -34,10 +35,19 @@ class PoseNet(pl.LightningModule):
         # set generator and parameter
         gen_hparams = copy.deepcopy(self.hparams)
         gen_hparams["mode"] = "generator"
-        self.gen = KudoModel(**gen_hparams)
         dis_hparams = copy.deepcopy(self.hparams)
         dis_hparams["mode"] = "discriminator"
-        self.dis = KudoModel(**dis_hparams)
+
+        if self.hparams.model_type == "martinez":
+            gen_hparams["num_stage"] = 4
+            dis_hparams["num_stage"] = 3
+            self.gen = MartinezModel(**gen_hparams)
+            self.dis = MartinezModel(**dis_hparams)
+        elif self.hparams.moddel_type == "kudo":
+            self.gen = KudoModel(**gen_hparams)
+            self.dis = KudoModel(**dis_hparams)
+        else:
+            raise NotImplementedError
 
         self.train_metrics = nn.ModuleDict(
             {"discriminator_accuracy": pl.metrics.Accuracy()}
