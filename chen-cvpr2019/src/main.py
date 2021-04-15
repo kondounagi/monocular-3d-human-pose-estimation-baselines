@@ -208,9 +208,9 @@ def cli_main():
     args = parser.parse_args()
 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        monitor="val_loss",
-        filename="best-model-{epoch:02d}-{val_loss:.2f}",
-        save_top_k=1,
+        monitor="val_mpjpe_epoch",
+        filename="best-model-{epoch:02d}-val-mpjpe-{val_loss:.2f}",
+        save_top_k=3,
         mode="min",
     )
     dm = CustomDataModule(
