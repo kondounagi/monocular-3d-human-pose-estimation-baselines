@@ -12,6 +12,7 @@ from pytorch_lightning.loggers import MLFlowLogger
 from kudo_model import KudoModel
 from martinez_model import MartinezModel
 from datamodule import CustomDataModule
+from mpjpe import MPJPE, P_MPJPE
 
 
 class PoseNet(pl.LightningModule):
@@ -49,11 +50,10 @@ class PoseNet(pl.LightningModule):
         else:
             raise NotImplementedError
 
-        self.train_metrics = nn.ModuleDict(
-            {"discriminator_accuracy": pl.metrics.Accuracy()}
-        )
-        # self.val_metrics = nn.ModuleDict({"acc": pl.metrics.Accuracy()})
-        # self.test_metrics = nn.ModuleDict({""})
+        self.val_mpjpe = MPJPE()
+        self.val_mpjpe = P_MPJPE()
+        self.test_p_mpjpe = MPJPE()
+        self.test_p_mpjpe = P_MPJPE()
 
     def forward(self, x):
         return self.gen(x)
@@ -130,14 +130,33 @@ class PoseNet(pl.LightningModule):
         xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
         z_pred = self(xy_real)
         loss = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
-        self.log("val_loss", loss)
+        self.log('val_loss_step', loss)
+
+        xyz_pred = torch.stack((xy_real, z_pred), dim=-1)
+        # NOTE: datamodule内でのscaleを反映する必要はないか？
+        self.log('val_mpjpe_step', self.val_mpjpe(xyz_pred, xyz))
+        self.log('val_p_mpjpe_step', self.val_p_mpjpe(xyz_pred, xyz))
+
+
+    def validation_epoch_end(self, val_step_outputs):
+        self.log('val_mpjpe_epoch', self.val_mpjpe.compute())
+        self.log('val_p_mpjpe_epoch', self.val_p_mpjpe.compute())
+
 
     def test_step(self, batch, batch_idx):
         xy_proj, xyz, scale = batch
         xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
         z_pred = self(xy_real)
         loss = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
-        self.log("test_loss", loss)
+        self.log('test_loss_step', loss)
+
+        xyz_pred = torch.stack((xy_real, z_pred), dim=-1)
+        self.log('test_mpjpe_step', self.test_mpjpe(xyz_pred, xyz))
+        self.log('test_p_mpjpe_step', self.test_p_mpjpe(xyz_pred, xyz))
+
+    def test_epoch_end(self, test_step_outputs)
+        self.log('test_mpjpe_epoch', self.test_mpjpe.compute())
+        self.log('test_p_mpjpe_epoch', self.test_p_mpjpe.compute())
 
     def configure_optimizers(self):
         # TODO: change lr between dis and gen
@@ -189,7 +208,9 @@ def cli_main():
     mlf_logger = MLFlowLogger(
         experiment_name="chen-cvpr2019", tracking_uri="file:./ml-runs"
     )
-    trainer = pl.Trainer.from_argparse_args(args, callbacks=[checkpoint_callback])
+    trainer = pl.Trainer.from_argparse_args(
+        args, callbacks=[checkpoint_callback], max_epochs=100
+    )
     # args, callbacks=[checkpoint_callback], logger=mlf_logger, auto_lr_find=True)
     # args, callbacks=[checkpoint_callback], auto_lr_find=True, max_epochs=3)
     trainer.tune(model, datamodule=dm)
