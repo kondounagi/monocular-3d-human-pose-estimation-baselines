@@ -7,25 +7,26 @@ from torch.nn import functional as F
 class MartinezModel(nn.Module):
     def __init__(
         self,
-        n_in: int = 34,
         n_unit: int = 1024,
         mode: str = "generator",
         num_stage: int = 2,
         p_dropout: float = 0.5,
+        **kwargs
     ):
-        super(LinearModel, self).__init__()
+        super(MartinezModel, self).__init__()
 
         self.n_unit = n_unit
         self.num_stage = num_stage
         self.p_dropout = p_dropout
         self.mode = mode
+        joint_num = 17
 
         if self.mode == "generator":
-            self.input_size = 16 * 2
-            self.output_size = 16 * 3
+            self.input_size = joint_num * 2
+            self.output_size = joint_num
         elif self.mode == "discriminator":
             # discriminator mode
-            self.input_size = 16 * 3
+            self.input_size = joint_num * 3
             self.output_size = 1
         else:
             raise NotImplementedError
@@ -48,7 +49,8 @@ class MartinezModel(nn.Module):
     def forward(self, x):
         # pre-processing
         y = self.w1(x)
-        y = self.batch_norm1(y)
+        # TODO: main側のスクリプトを修正してsqueezeを除く
+        y = self.batch_norm1(y.squeeze())
         y = self.relu(y)
         y = self.dropout(y)
 
@@ -59,7 +61,7 @@ class MartinezModel(nn.Module):
         y = self.w2(y)
 
         if self.mode == "discriminator":
-            y = torch.sigmoid(h4)
+            y = torch.sigmoid(y)
 
         return y
 

@@ -34,10 +34,15 @@ class PoseNet(pl.LightningModule):
         self.save_hyperparameters()
 
         # set generator and parameter
+        keys_to_remove = ("gen_lr", "dis_lr")
+
         gen_hparams = copy.deepcopy(self.hparams)
         gen_hparams["mode"] = "generator"
+        # gen_hparams.pop(keys_to_remove)
+
         dis_hparams = copy.deepcopy(self.hparams)
         dis_hparams["mode"] = "discriminator"
+        # dis_hparams.pop(keys_to_remove)
 
         if self.hparams.model_type == "martinez":
             gen_hparams["num_stage"] = 4
@@ -51,8 +56,8 @@ class PoseNet(pl.LightningModule):
             raise NotImplementedError
 
         self.val_mpjpe = MPJPE()
-        self.val_mpjpe = P_MPJPE()
-        self.test_p_mpjpe = MPJPE()
+        self.val_p_mpjpe = P_MPJPE()
+        self.test_mpjpe = MPJPE()
         self.test_p_mpjpe = P_MPJPE()
 
     def forward(self, x):
@@ -81,10 +86,11 @@ class PoseNet(pl.LightningModule):
             y = xy_real.narrow(-1, 1, 1).squeeze()
             # y = xy_real[:, 1::2]
             new_x = x * cos_theta + z_pred * sin_theta
-            xy_fake = torch.stack((new_x, y), dim=2)
+            xyz_fake = torch.stack((new_x, y, z_pred), dim=2)
+            xyz_real = xyz
 
-            y_real = self.dis(xy_real)
-            y_fake = self.dis(xy_fake)
+            y_real = self.dis(xyz_real.view(batch_size, -1))
+            y_fake = self.dis(xyz_fake.view(batch_size, -1))
 
             acc_dis_fake = pl.metrics.functional.accuracy(
                 y_fake, torch.zeros_like(y_fake, dtype=torch.int).to(self.device)
@@ -130,33 +136,41 @@ class PoseNet(pl.LightningModule):
         xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
         z_pred = self(xy_real)
         loss = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
-        self.log('val_loss_step', loss)
+        self.log("val_loss_step", loss)
 
-        xyz_pred = torch.stack((xy_real, z_pred), dim=-1)
+        batch_size = len(xyz)
+        xyz_pred = torch.cat(
+            (xy_real, z_pred),
+            dim=-1,
+        )
+        # xyz = xyz.view(batch_size, 17, 3)
         # NOTE: datamodule内でのscaleを反映する必要はないか？
-        self.log('val_mpjpe_step', self.val_mpjpe(xyz_pred, xyz))
-        self.log('val_p_mpjpe_step', self.val_p_mpjpe(xyz_pred, xyz))
-
+        self.log("val_mpjpe_step", self.val_mpjpe(xyz_pred, xyz))
+        self.log("val_p_mpjpe_step", self.val_p_mpjpe(xyz_pred, xyz))
 
     def validation_epoch_end(self, val_step_outputs):
-        self.log('val_mpjpe_epoch', self.val_mpjpe.compute())
-        self.log('val_p_mpjpe_epoch', self.val_p_mpjpe.compute())
-
+        self.log("val_mpjpe_epoch", self.val_mpjpe.compute())
+        self.log("val_p_mpjpe_epoch", self.val_p_mpjpe.compute())
 
     def test_step(self, batch, batch_idx):
         xy_proj, xyz, scale = batch
         xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
         z_pred = self(xy_real)
         loss = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
-        self.log('test_loss_step', loss)
+        self.log("test_loss_step", loss)
 
-        xyz_pred = torch.stack((xy_real, z_pred), dim=-1)
-        self.log('test_mpjpe_step', self.test_mpjpe(xyz_pred, xyz))
-        self.log('test_p_mpjpe_step', self.test_p_mpjpe(xyz_pred, xyz))
+        batch_size = len(xyz)
+        xyz_pred = torch.cat(
+            (xy_real, z_pred),
+            dim=-1,
+        )
+        xyz = xyz.view(batch_size, 17, 3)
+        self.log("test_mpjpe_step", self.test_mpjpe(xyz_pred, xyz))
+        self.log("test_p_mpjpe_step", self.test_p_mpjpe(xyz_pred, xyz))
 
-    def test_epoch_end(self, test_step_outputs)
-        self.log('test_mpjpe_epoch', self.test_mpjpe.compute())
-        self.log('test_p_mpjpe_epoch', self.test_p_mpjpe.compute())
+    def test_epoch_end(self, test_step_outputs):
+        self.log("test_mpjpe_epoch", self.test_mpjpe.compute())
+        self.log("test_p_mpjpe_epoch", self.test_p_mpjpe.compute())
 
     def configure_optimizers(self):
         # TODO: change lr between dis and gen
@@ -190,7 +204,7 @@ def cli_main():
 
     parser = ArgumentParser()
     parser = pl.Trainer.add_argparse_args(parser)
-    parser = MPIIDataModule.add_argparse_args(parser)
+    parser = CustomDataModule.add_argparse_args(parser)
     args = parser.parse_args()
 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
