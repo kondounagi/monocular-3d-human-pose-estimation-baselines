@@ -65,17 +65,12 @@ class PoseNet(pl.LightningModule):
             cos_theta = torch.cos(theta).to(self.device)
             sin_theta = torch.sin(theta).to(self.device)
 
-
-            # 2D Projection
-            # x = xy_real[:, 0::2]
-            # y = xy_real[:, 1::2]
-
             xy_real = xy_real.view(batch_size, 17, 2)
             x = xy_real.narrow(-1, 0, 1).squeeze()
             y = xy_real.narrow(-1, 1, 1).squeeze()
             # y = xy_real[:, 1::2]
             new_x = x * cos_theta + z_pred * sin_theta
-            xy_fake = torch.stack((new_x, y), dim=2)# .view(batch_size, -1)
+            xy_fake = torch.stack((new_x, y), dim=2)
 
             y_real = self.dis(xy_real)
             y_fake = self.dis(xy_fake)
@@ -112,7 +107,7 @@ class PoseNet(pl.LightningModule):
                 else:
                     pass
             elif optimizer_idx == 1:
-                if acc_dis <= self.hparams.gan_accuracy_cap:
+                if acc_dis < self.hparams.gan_accuracy_cap:
                     return loss_dis
                 else:
                     pass
@@ -132,10 +127,6 @@ class PoseNet(pl.LightningModule):
         z_pred = self(xy_real)
         loss = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
         self.log("test_loss", loss)
-        # x, y = batch
-        # y_hat = self(x)
-        # loss = F.mse_loss(y_hat, y)
-        # self.log("test_loss", loss)
 
     def configure_optimizers(self):
         # TODO: change lr between dis and gen
