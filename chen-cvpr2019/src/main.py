@@ -16,7 +16,8 @@ from datamodule import MPIIDataModule
 class PoseNet(pl.LightningModule):
     def __init__(
         self,
-        lr: float = 0.001,
+        gen_lr: float = 0.001,
+        dis_lr: float = 0.001,
         gan_accuracy_cap: float = 0.9,
         heuristic_loss_weight: float = 0.5,  # XXX: source ?
         use_heuristic_loss: bool = False,
@@ -130,8 +131,8 @@ class PoseNet(pl.LightningModule):
 
     def configure_optimizers(self):
         # TODO: change lr between dis and gen
-        opt_g = torch.optim.Adam(self.gen.parameters(), lr=self.hparams.lr)
-        opt_d = torch.optim.Adam(self.dis.parameters(), lr=self.hparams.lr)
+        opt_g = torch.optim.Adam(self.gen.parameters(), lr=self.hparams.gen_lr)
+        opt_d = torch.optim.Adam(self.dis.parameters(), lr=self.hparams.dis_lr)
         return [opt_g, opt_d], []
 
     @staticmethod
@@ -169,7 +170,7 @@ def cli_main():
         save_top_k=1,
         mode="min",
     )
-    dm = MPIIDataModule(use_sh_detection=args.use_sh_detection)
+    dm = MPIIDataModule(use_sh_detection=args.use_sh_detection, batch_size=args.batch_size)
 
     model = PoseNet()
 
