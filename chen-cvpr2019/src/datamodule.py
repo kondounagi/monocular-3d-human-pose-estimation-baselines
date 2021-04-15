@@ -7,7 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
 
 
-class MPIIDataModule(LightningDataModule):
+class CustomDataModule(LightningDataModule):
     def __init__(self, use_sh_detection: bool = False, batch_size: int = 16):
         super().__init__()
         self.use_sh_detection = use_sh_detection

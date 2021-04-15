@@ -10,7 +10,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import MLFlowLogger
 
 from kudo_model import KudoModel
-from datamodule import MPIIDataModule
+from datamodule import CustomDataModule
 
 
 class PoseNet(pl.LightningModule):
@@ -170,7 +170,9 @@ def cli_main():
         save_top_k=1,
         mode="min",
     )
-    dm = MPIIDataModule(use_sh_detection=args.use_sh_detection, batch_size=args.batch_size)
+    dm = CustomDataModule(
+        use_sh_detection=args.use_sh_detection, batch_size=args.batch_size
+    )
 
     model = PoseNet()
 
@@ -181,10 +183,7 @@ def cli_main():
     # args, callbacks=[checkpoint_callback], logger=mlf_logger, auto_lr_find=True)
     # args, callbacks=[checkpoint_callback], auto_lr_find=True, max_epochs=3)
     trainer.tune(model, datamodule=dm)
-    trainer.fit(
-        model,
-        dm
-    )
+    trainer.fit(model, dm)
 
     result = trainer.test(model, datamodule=dm)
     pprint(result)
