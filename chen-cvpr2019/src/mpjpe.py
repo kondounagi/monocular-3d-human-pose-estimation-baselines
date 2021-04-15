@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from pytorch_lighting.metrics import Metric
+from pytorch_lightning.metrics import Metric
 
 
 class MPJPE(Metric):
@@ -8,12 +8,15 @@ class MPJPE(Metric):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
         self.add_state("error", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("len", default=torch.tensor(0), dist_reduce_fx="sum")
 
     def update(self, predicted: torch.Tensor, target: torch.Tensor):
         # predicted.shape should be (batch_size, joint_num * 3)
-        assert predicted.shape.dim() == 2
         assert predicted.shape == target.shape
-        self.error += mpjpe(predicted, target)
+        batch_size = len(target)
+        self.error += mpjpe(
+            predicted.view(batch_size, 17, 3), target.view(batch_size, 17, 3)
+        )
         self.len += len(target)
 
     def compute(self):
@@ -25,12 +28,16 @@ class P_MPJPE(Metric):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
         self.add_state("error", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("len", default=torch.tensor(0), dist_reduce_fx="sum")
 
     def update(self, predicted: torch.Tensor, target: torch.Tensor):
         # predicted.shape should be (batch_size, joint_num * 3)
-        assert predicted.shape.dim() == 2
         assert predicted.shape == target.shape
-        self.error += p_mpjpe(predicted, target)
+        batch_size = len(target)
+        self.error += p_mpjpe(
+            predicted.view(batch_size, 17, 3).cpu().numpy(),
+            target.view(batch_size, 17, 3).cpu().numpy(),
+        )
         self.len += len(target)
 
     def compute(self):
