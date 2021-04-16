@@ -10,12 +10,13 @@ class MPJPE(Metric):
         self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("len", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self, predicted: torch.Tensor, target: torch.Tensor):
+    def update(self, predicted: torch.Tensor, target: torch.Tensor, scale: torch.Tensor):
         # predicted.shape should be (batch_size, joint_num * 3)
         assert predicted.shape == target.shape
         batch_size = len(target)
         self.error += mpjpe(
             predicted.view(batch_size, 17, 3), target.view(batch_size, 17, 3)
+            scale.cpu().numpy(),
         )
         self.len += len(target)
 
@@ -30,13 +31,16 @@ class P_MPJPE(Metric):
         self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("len", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self, predicted: torch.Tensor, target: torch.Tensor):
+    def update(
+        self, predicted: torch.Tensor, target: torch.Tensor, scale: torch.Tensor
+    ):
         # predicted.shape should be (batch_size, joint_num * 3)
         assert predicted.shape == target.shape
         batch_size = len(target)
         self.error += p_mpjpe(
             predicted.view(batch_size, 17, 3).cpu().numpy(),
             target.view(batch_size, 17, 3).cpu().numpy(),
+            scale.cpu().numpy(),
         )
         self.len += len(target)
 
@@ -44,13 +48,13 @@ class P_MPJPE(Metric):
         return self.error.float() / self.len
 
 
-def mpjpe(predicted, target):
+def mpjpe(predicted, target, scale):
     """
     Mean per-joint position error (i.e. mean Euclidean distance),
     often referred to as "Protocol #1" in many papers.
     """
     assert predicted.shape == target.shape
-    return torch.mean(torch.norm(predicted - target, dim=len(target.shape) - 1))
+    return torch.mean(torch.norm(predicted - target, dim=len(target.shape) - 1) * scale)
 
 
 def weighted_mpjpe(predicted, target, w):
@@ -62,7 +66,7 @@ def weighted_mpjpe(predicted, target, w):
     return torch.mean(w * torch.norm(predicted - target, dim=len(target.shape) - 1))
 
 
-def p_mpjpe(predicted, target):
+def p_mpjpe(predicted, target, scale):
     """
     Pose error: MPJPE after rigid alignment (scale, rotation, and translation),
     often referred to as "Protocol #2" in many papers.
@@ -102,7 +106,7 @@ def p_mpjpe(predicted, target):
 
     # Return MPJPE
     return np.mean(
-        np.linalg.norm(predicted_aligned - target, axis=len(target.shape) - 1)
+        np.linalg.norm(predicted_aligned - target, axis=len(target.shape) - 1) * scale
     )
 
 
