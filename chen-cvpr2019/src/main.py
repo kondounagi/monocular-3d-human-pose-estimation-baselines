@@ -28,7 +28,7 @@ class PoseNet(pl.LightningModule):
         n_unit: int = 1024,
         mode: str = "unsupervised",
         activate_func=F.leaky_relu,
-        model_type: str = "martinez",
+        model_type: str = "kudo",
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -49,7 +49,7 @@ class PoseNet(pl.LightningModule):
             dis_hparams["num_stage"] = 3
             self.gen = MartinezModel(**gen_hparams)
             self.dis = MartinezModel(**dis_hparams)
-        elif self.hparams.moddel_type == "kudo":
+        elif self.hparams.model_type == "kudo":
             self.gen = KudoModel(**gen_hparams)
             self.dis = KudoModel(**dis_hparams)
         else:
@@ -69,9 +69,9 @@ class PoseNet(pl.LightningModule):
         xy_proj, xyz, scale = batch
         batch_size = len(xy_proj)
         xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
-        z_real = xyz.narrow(-1, 2, 1)
+        z_real = xyz.view(batch_size, 17, 3).narrow(-1, 2, 1)
         z_pred = self(xy_real)
-        z_mse = F.mse_loss(z_pred, z_real)
+        z_mse = F.mse_loss(z_pred, z_real.view(batch_size, -1))
         if self.hparams.mode == "supervised":
             return z_mse
         elif self.hparams.mode == "unsupervised":
@@ -103,7 +103,8 @@ class PoseNet(pl.LightningModule):
             loss_gen = F.softplus(-y_fake).sum() / batch_size
             if self.hparams.use_heuristic_loss:
                 loss_heuristic = self.calculate_heuristic_loss(
-                    xy_real=xy_real, z_pred=z_pred
+                    xy_real=xy_real.view(batch_size, -1, 2),
+                    z_pred=z_pred.view(batch_size, -1, 1),
                 )
                 loss_gen += loss_heuristic * self.hparams.heuristic_loss_weight
                 self.log("loss_heuristic", loss_heuristic)
@@ -146,7 +147,7 @@ class PoseNet(pl.LightningModule):
         # xyz = xyz.view(batch_size, 17, 3)
         # NOTE: datamodule内でのscaleを反映する必要はないか？
         self.log("val_mpjpe_step", self.val_mpjpe(xyz_pred, xyz))
-        self.log("val_p_mpjpe_step", self.val_p_mpjpe(xyz_pred, xyz))
+        self.log("val_p_mpjpe_step", self.val_p_mpjpe(xyz_pred, xyz, scale))
 
     def validation_epoch_end(self, val_step_outputs):
         self.log("val_mpjpe_epoch", self.val_mpjpe.compute())
@@ -164,7 +165,6 @@ class PoseNet(pl.LightningModule):
             (xy_real, z_pred),
             dim=-1,
         )
-        xyz = xyz.view(batch_size, 17, 3)
         self.log("test_mpjpe_step", self.test_mpjpe(xyz_pred, xyz))
         self.log("test_p_mpjpe_step", self.test_p_mpjpe(xyz_pred, xyz))
 
@@ -181,8 +181,10 @@ class PoseNet(pl.LightningModule):
     @staticmethod
     def calculate_rotation(xy_real, z_pred):
         # xy_real: batch_num * joint_num * 2(xy axis)
-        xy_split = torch.split(xy_real, xy_real.shape[1], dim=1)
-        z_split = torch.split(z_pred, z_pred.shape[1], dim=1)
+        batch_num = len(xy_real)
+        joint_num = 17
+        xy_split = xy_real.view(batch_num, joint_num, 2)  # (batch_num, joint_num, 2)
+        z_split = z_pred.view(batch_num, joint_num, 1)  # (batch_num, joint_num, 1)
         # Vector v0 (neck -> nose) on zx-plain. v0=(a0, b0).
         a0 = z_split[9] - z_split[8]
         b0 = xy_split[9 * 2] - xy_split[8 * 2]
@@ -194,7 +196,6 @@ class PoseNet(pl.LightningModule):
         # Return sine value of the angle between v0 and v1.
         return (a0 * b1 - a1 * b0) / (n0 * n1)
 
-    @staticmethod
     def calculate_heuristic_loss(self, xy_real, z_pred):
         return torch.mean(F.relu(-self.calculate_rotation(xy_real, z_pred)))
 

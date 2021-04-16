@@ -6,7 +6,6 @@ from torch.nn import functional as F
 class KudoModel(nn.Module):
     def __init__(
         self,
-        n_in: int = 34,
         n_unit: int = 1024,
         mode: str = "supervised",
         use_bn: bool = True,
@@ -14,17 +13,26 @@ class KudoModel(nn.Module):
         **kwargs
     ):
         super().__init__()
-        self.n_in = n_in
+
         self.n_unit = n_unit
         self.mode = mode
         self.use_bn = use_bn
         self.activate_func = activate_func
-        self.n_out = n_in // 2 if mode == "generator" else 1
+        joint_num = 17
+        if self.mode == "generator":
+            self.input_size = joint_num * 2
+            self.output_size = joint_num
+        elif self.mode == "discriminator":
+            # discriminator mode
+            self.input_size = joint_num * 3
+            self.output_size = 1
+        else:
+            raise NotImplementedError
 
-        self.l1 = nn.Linear(self.n_in, self.n_unit)
+        self.l1 = nn.Linear(self.input_size, self.n_unit)
         self.l2 = nn.Linear(self.n_unit, self.n_unit)
         self.l3 = nn.Linear(self.n_unit, self.n_unit)
-        self.l4 = nn.Linear(self.n_unit, self.n_out)
+        self.l4 = nn.Linear(self.n_unit, self.output_size)
 
         if self.use_bn:
             self.bn1 = nn.BatchNorm1d(self.n_unit)
