@@ -146,7 +146,7 @@ class PoseNet(pl.LightningModule):
         )
         # xyz = xyz.view(batch_size, 17, 3)
         # NOTE: datamodule内でのscaleを反映する必要はないか？
-        self.log("val_mpjpe_step", self.val_mpjpe(xyz_pred, xyz))
+        self.log("val_mpjpe_step", self.val_mpjpe(xyz_pred, xyz, scale))
         self.log("val_p_mpjpe_step", self.val_p_mpjpe(xyz_pred, xyz, scale))
 
     def validation_epoch_end(self, val_step_outputs):
@@ -165,8 +165,8 @@ class PoseNet(pl.LightningModule):
             (xy_real, z_pred),
             dim=-1,
         )
-        self.log("test_mpjpe_step", self.test_mpjpe(xyz_pred, xyz))
-        self.log("test_p_mpjpe_step", self.test_p_mpjpe(xyz_pred, xyz))
+        self.log("test_mpjpe_step", self.test_mpjpe(xyz_pred, xyz, scale))
+        self.log("test_p_mpjpe_step", self.test_p_mpjpe(xyz_pred, xyz, scale))
 
     def test_epoch_end(self, test_step_outputs):
         self.log("test_mpjpe_epoch", self.test_mpjpe.compute())
