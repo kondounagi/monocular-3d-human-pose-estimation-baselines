@@ -5,7 +5,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     apt-utils \
     gcc \
-    build-essential
+    build-essential \
+    ffmpeg \
+    libsm6 \
+    libxext6
 RUN pip install --upgrade pip \
     && pip install --upgrade setuptools \
     && pip install --no-cache-dir \
@@ -14,6 +17,7 @@ RUN pip install --upgrade pip \
     black \
     pytorch-lightning \
     mlflow \
+    opencv-contrib-python \
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
