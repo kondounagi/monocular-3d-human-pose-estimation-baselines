@@ -10,12 +10,15 @@ class MPJPE(Metric):
         self.add_state("total", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("len", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self, predicted: torch.Tensor, target: torch.Tensor, scale: torch.Tensor):
+    def update(
+        self, predicted: torch.Tensor, target: torch.Tensor, scale: torch.Tensor
+    ):
         # predicted.shape should be (batch_size, joint_num * 3)
         assert predicted.shape == target.shape
         batch_size = len(target)
         self.error += mpjpe(
-            predicted.view(batch_size, 17, 3), target.view(batch_size, 17, 3)
+            predicted.view(batch_size, 17, 3).cpu().numpy(),
+            target.view(batch_size, 17, 3).cpu().numpy(),
             scale.cpu().numpy(),
         )
         self.len += len(target)
