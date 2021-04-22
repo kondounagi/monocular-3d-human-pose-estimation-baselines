@@ -1,0 +1,11 @@
+activate_func: !!python/name:torch.nn.functional.leaky_relu ""
+dis_lr: 0.001
+gan_accuracy_cap: 0.9
+gen_lr: 0.001
+heuristic_loss_weight: 0.5
+mode: unsupervised
+model_type: kudo
+n_in: 34
+n_unit: 1024
+use_heuristic_loss: false
+use_sh_detection: false

@@ -2,3 +2,4 @@ false/
 lightning_logs/
 data/
 demo_out/
+test/pose_iter_440000.caffemodel
