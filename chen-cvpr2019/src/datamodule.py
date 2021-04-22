@@ -49,6 +49,7 @@ class Normalization(object):
     def normalize_2d(pose):
         # 2DPoseの正規化
         # hip(0)と各関節点の距離の平均値が1になるようにスケール
+        pose = pose.flatten()
         xs = pose.T[0::2] - pose.T[0]
         ys = pose.T[1::2] - pose.T[1]
         pose = pose.T / np.sqrt(xs[1:] ** 2 + ys[1:] ** 2).mean(axis=0)
