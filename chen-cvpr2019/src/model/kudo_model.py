@@ -40,7 +40,7 @@ class KudoModel(nn.Module):
             self.bn3 = nn.BatchNorm1d(self.n_unit)
 
     def forward(self, x):
-        x = x.view(x.size(0), -1)
+        x = x.view(-1, self.input_size)
         if self.use_bn:
             h1 = self.activate_func(self.bn1(self.l1(x)))
             h2 = self.activate_func(self.bn2(self.l2(h1)))
