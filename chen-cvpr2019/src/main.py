@@ -28,21 +28,17 @@ class PoseNet(pl.LightningModule):
         n_unit: int = 1024,
         mode: str = "unsupervised",
         activate_func=F.leaky_relu,
-        model_type: str = "kudo",
+        model_type: str = "martinez",
     ):
         super().__init__()
         self.save_hyperparameters()
 
         # set generator and parameter
-        keys_to_remove = ("gen_lr", "dis_lr")
-
         gen_hparams = copy.deepcopy(self.hparams)
         gen_hparams["mode"] = "generator"
-        # gen_hparams.pop(keys_to_remove)
 
         dis_hparams = copy.deepcopy(self.hparams)
         dis_hparams["mode"] = "discriminator"
-        # dis_hparams.pop(keys_to_remove)
 
         if self.hparams.model_type == "martinez":
             gen_hparams["num_stage"] = 4
@@ -211,7 +207,7 @@ def cli_main():
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         monitor="val_mpjpe_epoch",
         filename="best-model-{epoch:02d}-val-mpjpe-{val_loss:.2f}",
-        save_top_k=3,
+        save_top_k=1,
         mode="min",
     )
     dm = CustomDataModule(
