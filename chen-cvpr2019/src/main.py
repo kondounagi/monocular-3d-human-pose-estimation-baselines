@@ -9,10 +9,9 @@ from torch.nn import functional as F
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import MLFlowLogger
 
-from kudo_model import KudoModel
-from martinez_model import MartinezModel
+from model import KudoModel, MartinezModel
 from datamodule import CustomDataModule
-from mpjpe import MPJPE, P_MPJPE
+from metrics import MPJPE, P_MPJPE
 
 
 class PoseNet(pl.LightningModule):
