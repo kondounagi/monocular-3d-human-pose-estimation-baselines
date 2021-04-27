@@ -36,7 +36,7 @@ class MartinezModel(nn.Module):
         self.batch_norm1 = nn.BatchNorm1d(self.n_unit)
 
         self.linear_stages = []
-        for l in range(num_stage):
+        for _ in range(num_stage):
             self.linear_stages.append(Linear(self.n_unit, self.p_dropout))
         self.linear_stages = nn.ModuleList(self.linear_stages)
 

@@ -17,9 +17,9 @@ class MPJPE(Metric):
         assert predicted.shape == target.shape
         batch_size = len(target)
         self.error += mpjpe(
-            predicted.view(batch_size, 17, 3).cpu().numpy(),
-            target.view(batch_size, 17, 3).cpu().numpy(),
-            scale.cpu().numpy(),
+            predicted.view(batch_size, 17, 3),  # .cpu().numpy(),
+            target.view(batch_size, 17, 3),  # .cpu().numpy(),
+            scale,  # .cpu().numpy(),
         )
         self.len += len(target)
 

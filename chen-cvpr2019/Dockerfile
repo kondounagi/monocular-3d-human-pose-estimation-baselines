@@ -18,6 +18,7 @@ RUN pip install --upgrade pip \
     pytorch-lightning \
     mlflow \
     opencv-contrib-python \
+    optuna \
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*

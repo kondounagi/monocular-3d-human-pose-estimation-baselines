@@ -8,10 +8,14 @@ from torch import nn
 from torch.nn import functional as F
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import MLFlowLogger
+import optuna
+from optuna.integration import PyTorchLightningPruningCallback
 
 from model import KudoModel, MartinezModel
 from datamodule import CustomDataModule
 from metrics import MPJPE, P_MPJPE
+
+JOINT_NUM = 17
 
 
 class PoseNet(pl.LightningModule):
@@ -19,6 +23,8 @@ class PoseNet(pl.LightningModule):
         self,
         gen_lr: float = 0.001,
         dis_lr: float = 0.001,
+        gen_eps: float = 1e-8,
+        dis_eps: float = 1e-8,
         gan_accuracy_cap: float = 0.9,
         heuristic_loss_weight: float = 0.5,  # XXX: source ?
         use_heuristic_loss: bool = False,
@@ -63,8 +69,8 @@ class PoseNet(pl.LightningModule):
         # xy_proj, xyz, scale = batch
         xy_proj, xyz, scale = batch
         batch_size = len(xy_proj)
-        xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
-        z_real = xyz.view(batch_size, 17, 3).narrow(-1, 2, 1)
+        xy_real, xyz = xy_proj.view(-1, JOINT_NUM * 2), xyz.view(-1, JOINT_NUM, 3)
+        z_real = xyz.view(batch_size, JOINT_NUM, 3).narrow(-1, 2, 1)
         z_pred = self(xy_real)
         z_mse = F.mse_loss(z_pred, z_real.view(batch_size, -1))
         if self.hparams.mode == "supervised":
@@ -76,7 +82,7 @@ class PoseNet(pl.LightningModule):
             cos_theta = torch.cos(theta).to(self.device)
             sin_theta = torch.sin(theta).to(self.device)
 
-            xy_real = xy_real.view(batch_size, 17, 2)
+            xy_real = xy_real.view(batch_size, JOINT_NUM, 2)
             x = xy_real.narrow(-1, 0, 1).squeeze()
             y = xy_real.narrow(-1, 1, 1).squeeze()
             # y = xy_real[:, 1::2]
@@ -129,17 +135,15 @@ class PoseNet(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         xy_proj, xyz, scale = batch
-        xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
+        xy_real, xyz = xy_proj.view(-1, JOINT_NUM * 2), xyz.view(-1, JOINT_NUM, 3)
         z_pred = self(xy_real)
-        loss = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
-        self.log("val_loss_step", loss)
 
-        batch_size = len(xyz)
         xyz_pred = torch.cat(
-            (xy_real, z_pred),
-            dim=-1,
+            (xy_real.view(-1, JOINT_NUM, 2), z_pred.view(-1, JOINT_NUM, 1)), dim=2
         )
-        # xyz = xyz.view(batch_size, 17, 3)
+        loss = F.mse_loss(xyz_pred, xyz)
+        self.log("val_loss_step", loss)
+        # xyz = xyz.view(batch_size, JOINT_NUM, 3)
         # NOTE: datamodule内でのscaleを反映する必要はないか？
         self.log("val_mpjpe_step", self.val_mpjpe(xyz_pred, xyz, scale))
         self.log("val_p_mpjpe_step", self.val_p_mpjpe(xyz_pred, xyz, scale))
@@ -150,16 +154,14 @@ class PoseNet(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         xy_proj, xyz, scale = batch
-        xy_real, xyz = xy_proj[:, 0], xyz[:, 0]
+        xy_real, xyz = xy_proj.view(-1, JOINT_NUM * 2), xyz.view(-1, JOINT_NUM, 3)
         z_pred = self(xy_real)
-        loss = F.mse_loss(z_pred, xyz.narrow(-1, 2, 1))
-        self.log("test_loss_step", loss)
 
-        batch_size = len(xyz)
         xyz_pred = torch.cat(
-            (xy_real, z_pred),
-            dim=-1,
+            (xy_real.view(-1, JOINT_NUM, 2), z_pred.view(-1, JOINT_NUM, 1)), dim=2
         )
+        loss = F.mse_loss(xyz_pred, xyz)
+        self.log("test_loss_step", loss)
         self.log("test_mpjpe_step", self.test_mpjpe(xyz_pred, xyz, scale))
         self.log("test_p_mpjpe_step", self.test_p_mpjpe(xyz_pred, xyz, scale))
 
@@ -169,15 +171,19 @@ class PoseNet(pl.LightningModule):
 
     def configure_optimizers(self):
         # TODO: change lr between dis and gen
-        opt_g = torch.optim.Adam(self.gen.parameters(), lr=self.hparams.gen_lr)
-        opt_d = torch.optim.Adam(self.dis.parameters(), lr=self.hparams.dis_lr)
+        opt_g = torch.optim.Adam(
+            self.gen.parameters(), lr=self.hparams.gen_lr, eps=self.hparams.gen_eps
+        )
+        opt_d = torch.optim.Adam(
+            self.dis.parameters(), lr=self.hparams.dis_lr, eps=self.hparams.dis_eps
+        )
         return [opt_g, opt_d], []
 
     @staticmethod
     def calculate_rotation(xy_real, z_pred):
         # xy_real: batch_num * joint_num * 2(xy axis)
         batch_num = len(xy_real)
-        joint_num = 17
+        joint_num = JOINT_NUM
         xy_split = xy_real.view(batch_num, joint_num, 2)  # (batch_num, joint_num, 2)
         z_split = z_pred.view(batch_num, joint_num, 1)  # (batch_num, joint_num, 1)
         # Vector v0 (neck -> nose) on zx-plain. v0=(a0, b0).
@@ -193,6 +199,27 @@ class PoseNet(pl.LightningModule):
 
     def calculate_heuristic_loss(self, xy_real, z_pred):
         return torch.mean(F.relu(-self.calculate_rotation(xy_real, z_pred)))
+
+
+# def objective(trial: optuna.trial.Trial) -> float:
+#     # We optimize the number of layers, hidden units in each layer and dropouts.
+#     gen_lr = trial.suggest_float("gen_lr", 1e-4, 0.01)
+#     dis_lr = trial.suggest_float("dis_lr", 1e-4, 0.01)
+#     gen_eps = trial.suggest_float("gen_eps", 1e-10, 1e-6)
+#     dis_eps = trial.suggest_float("dis_eps", 1e-10, 1e-6)
+
+#     trainer = pl.Trainer(
+#         logger=True,
+#         checkpoint_callback=False,
+#         max_epochs=EPOCHS,
+#         gpus=-1 if torch.cuda.is_available() else None,
+#         callbacks=[PyTorchLightningPruningCallback(trial, monitor="val_acc")],
+#     )
+#     hyperparameters = dict(n_layers=n_layers, dropout=dropout, output_dims=output_dims)
+#     trainer.logger.log_hyperparams(hyperparameters)
+#     trainer.fit(model, datamodule=datamodule)
+
+#     return trainer.callback_metrics["val_acc"].item()
 
 
 def cli_main():
@@ -219,7 +246,10 @@ def cli_main():
         experiment_name="chen-cvpr2019", tracking_uri="file:./ml-runs"
     )
     trainer = pl.Trainer.from_argparse_args(
-        args, callbacks=[checkpoint_callback], max_epochs=100
+        args,
+        # callbacks=[PyTorchLightningPruningCallback(trial, monitor="val_mpjpe_epoch")],
+        callbacks=[checkpoint_callback],
+        max_epochs=100,
     )
     # args, callbacks=[checkpoint_callback], logger=mlf_logger, auto_lr_find=True)
     # args, callbacks=[checkpoint_callback], auto_lr_find=True, max_epochs=3)
