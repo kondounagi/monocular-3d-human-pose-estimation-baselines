@@ -268,7 +268,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--dataset", type=str, default="COCO")
     parser.add_argument(
-        "--ckpt", type=str, default="./data/test/checkpoints/pretrained_model.ckpt"
+        "--ckpt", type=str, default="./test/checkpoints/pretrained_model.ckpt"
     )
 
     args = parser.parse_args()
