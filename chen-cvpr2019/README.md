@@ -42,7 +42,9 @@ $ python main.py --help
 
 
 ### Demo
-Given an input image, 2D pose is predicted by pretrained model, 
+Given an input image, 2D pose is predicted by pretrained model, and 3D pose is estimated.
+The result is in `./demo_out`.
+At first time, please install 2d pose estimator model by running `bash ./download_2d_pose_estimator.sh`.
 ```
 $ python demo.py
 ```
