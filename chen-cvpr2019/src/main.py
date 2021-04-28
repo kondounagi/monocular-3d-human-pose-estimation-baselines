@@ -8,8 +8,6 @@ from torch import nn
 from torch.nn import functional as F
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import MLFlowLogger
-import optuna
-from optuna.integration import PyTorchLightningPruningCallback
 
 from model import KudoModel, MartinezModel
 from datamodule import CustomDataModule
@@ -201,27 +199,6 @@ class PoseNet(pl.LightningModule):
         return torch.mean(F.relu(-self.calculate_rotation(xy_real, z_pred)))
 
 
-# def objective(trial: optuna.trial.Trial) -> float:
-#     # We optimize the number of layers, hidden units in each layer and dropouts.
-#     gen_lr = trial.suggest_float("gen_lr", 1e-4, 0.01)
-#     dis_lr = trial.suggest_float("dis_lr", 1e-4, 0.01)
-#     gen_eps = trial.suggest_float("gen_eps", 1e-10, 1e-6)
-#     dis_eps = trial.suggest_float("dis_eps", 1e-10, 1e-6)
-
-#     trainer = pl.Trainer(
-#         logger=True,
-#         checkpoint_callback=False,
-#         max_epochs=EPOCHS,
-#         gpus=-1 if torch.cuda.is_available() else None,
-#         callbacks=[PyTorchLightningPruningCallback(trial, monitor="val_acc")],
-#     )
-#     hyperparameters = dict(n_layers=n_layers, dropout=dropout, output_dims=output_dims)
-#     trainer.logger.log_hyperparams(hyperparameters)
-#     trainer.fit(model, datamodule=datamodule)
-
-#     return trainer.callback_metrics["val_acc"].item()
-
-
 def cli_main():
     pl.seed_everything(1234)
 
@@ -232,7 +209,7 @@ def cli_main():
 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         monitor="val_mpjpe_epoch",
-        filename="best-model-{epoch:02d}-val-mpjpe-{val_loss:.2f}",
+        filename="best-model-{epoch:02d}-val-mpjpe-{val_mpjpe_epoch:.2f}",
         save_top_k=1,
         mode="min",
     )
