@@ -48,9 +48,9 @@ class MartinezModel(nn.Module):
 
     def forward(self, x):
         # pre-processing
+        x = x.view(-1, self.input_size)
         y = self.w1(x)
-        # TODO: main側のスクリプトを修正してsqueezeを除く
-        y = self.batch_norm1(y.squeeze())
+        y = self.batch_norm1(y)
         y = self.relu(y)
         y = self.dropout(y)
 
