@@ -34,17 +34,19 @@ $ python main.py --help
 
 | Option | Explanation | Default |
 | -------- | -------- | -------- |
-| --gen_lr     | Learning rate of generator's optimizer (Adam)     | 0.001     |
-| --dis_lr     | Learning rate of discriminator's optimizer (Adam)     | 0.001     |
-| --gen_eps     | Epsilon of generaotr's optimizer (Adam)     | 1e-8     |
-| --dis_eps     | Epsilon of discriminator's optimizer (Adam)     | 1e-8     |
-| --gan_accuracy_cap     | Accuracy cap for discriminator     | 0.9     |
+| `--gen_lr`     | Learning rate of generator's optimizer (Adam)     | 0.001     |
+| `--dis_lr`     | Learning rate of discriminator's optimizer (Adam)     | 0.001     |
+| `--gen_eps`     | Epsilon of generaotr's optimizer (Adam)     | 1e-8     |
+| `--dis_eps`     | Epsilon of discriminator's optimizer (Adam)     | 1e-8     |
+| `--gan_accuracy_cap`     | Accuracy cap for discriminator     | 0.9     |
 
 
 ### Demo
 Given an input image, 2D pose is predicted by pretrained model, and 3D pose is estimated.
 The result is in `./demo_out`.
-At first time, please install 2d pose estimator model by running `bash ./download_2d_pose_estimator.sh`.
+At first time, please download 2d pose estimator model by just running `bash ./download_2d_pose_estimator.sh`.
+You can download pretrained pytorch model from [this google drive link](https://drive.google.com/file/d/1qFL4WXVS7Atll1qaqa-gG8LtA1j7BIyJ/view?usp=sharing).
+Specify the path to pretrained_model.ckpt file by `--ckpt` option, or place it to the default directory (`./test/checkpoints/pretrained_model.ckpt`).
 ```
 $ python demo.py
 ```
@@ -53,11 +55,11 @@ $ python demo.py
 
 | Option | Explanation | Default |
 | -------- | -------- | -------- |
-| --input     | Input image path     | ./test/input_sample.png     |
-| --width     | Resize input to specific width    | 368     |
-| --height     | Resize input to specific height | 368     |
-| --thr     | Threshold value for pose parts heat map     | 0.1     |
-| --ckpt     | Checkpoint file path from trained pytorch-lightning     | ./test/checkpoints/pretrained_model.ckpt|
+| `--input`     | Input image path     | ./test/input_sample.png     |
+| `--width`     | Resize input to specific width    | 368     |
+| `--height`     | Resize input to specific height | 368     |
+| `--thr`    | Threshold value for pose parts heat map     | 0.1     |
+| `--ckpt`     | Checkpoint file path from trained pytorch-lightning     | ./test/checkpoints/pretrained_model.ckpt|
 
 
 ## Result
